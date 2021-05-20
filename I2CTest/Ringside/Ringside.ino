@@ -1,31 +1,52 @@
 #include <Adafruit_NeoPixel.h>
+#include <HT16K33.h>
 #include <Wire.h>
 
+// Pix Ring
 #define NEOPIX_PIN 11
 #define STRIPSIZE 12
-
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(STRIPSIZE, NEOPIX_PIN, NEO_GRBW + NEO_KHZ800);
+
+// 7-Segment display
+HT16K33 seg(0x70);
+int numDis = 0;
+
+#define DCMOTOR_PIN 10
 
 void setup() {
   Wire.begin();        // join i2c bus (address optional for master)
   Serial.begin(9600);  // start serial for output
-
+  // Pix Ring
   strip.begin();
   strip.setBrightness(10);
+  // Motor placeholder
+  pinMode(DCMOTOR_PIN, OUTPUT);
+  // 7-seg
+  seg.begin();
+  Wire.setClock(100000);
+  seg.displayOn();
+  seg.brightness(2);
+  seg.displayClear();
+  seg.blink(0);
+  seg.setDigits(4);
 }
 
 void loop() {
-  Wire.requestFrom(8, 1);    // request 6 bytes from slave device #8
+  Wire.requestFrom(8, 3);    // request 6 bytes from slave device #8
 
-  int c;
+  int c[3]; // DEVICE_COUNT
+  int i = 0;
   while (Wire.available()) { // slave may send less than requested
-    c = Wire.read(); // receive a byte as character
-    Serial.println(c);         // print the character
+    c[i] = Wire.read(); // receive a byte as character
+    //Serial.print(c[i]); 
+    //Serial.print(' ');
+    i++;
   }
+  //Serial.println();
 
-  // Neopixel Strip
+  // 0 Neopixel Strip
   strip.clear();
-  switch(c) {
+  switch(c[0]) {
     case 0: 
       strip.setPixelColor(0, 255,0,0);
       break;
@@ -59,5 +80,24 @@ void loop() {
   }
   strip.show();
 
+  // 1 Dc motor
+  if(c[1]) {
+    digitalWrite(DCMOTOR_PIN, HIGH);
+  } else {
+    digitalWrite(DCMOTOR_PIN, LOW);
+  }
+
+  // 2 7-seg
+  c[2]-=48;
+  if(c[2]>=0){
+    if(numDis>=1000){
+      numDis = (numDis%1000)*10+c[2];
+    } else {
+      numDis = numDis*10+c[2];
+    }   
+    Serial.println(numDis);
+  }
+  seg.displayInt(numDis);
+  
   delay(100);
 }
